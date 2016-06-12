@@ -45,6 +45,31 @@ def create_db(csv_path):
         sys.exit(1)
 
 
+def filter_db(input_db, key_filter, val_filter):
+    """Returns a new database with filters applied.
+
+    Opens a database and reads the key values for each entry. All entries with
+    key values that match the provided filter arguments are added to a temp
+    database and returned.
+
+    Args:
+        input_db (list[dict]): The database to filter.
+        key_filter (str): The key to filter.
+        val_filter (str): The key value required for entries in the filtered
+            database.
+
+    Returns:
+        list[dict]: The filtered database.
+    """
+    filtered_db = []
+
+    for entry in input_db:
+        if entry[key_filter] == val_filter:
+            filtered_db.append(entry)
+
+    return filtered_db
+
+
 @app.route('/businesses', methods=['GET'])
 def get_businesses():
     """Displays a paginated list of businesses sorted by ID.
@@ -56,14 +81,32 @@ def get_businesses():
     Returns:
         dict: Business information and pagination metadata.
     """
+    global db
+
+    businesses = db
+    filters = {}
     entries = int(request.args['entries']) if 'entries' in request.args else 50
     page = int(request.args['page']) if 'page' in request.args else 1
     start = (page-1) * entries
     end = start + entries
-    if len(db[start:end]) > 0:
-        return jsonify({'businesses': db[start:end],
-                        'page': page,
-                        'entries': entries})
+
+    # Apply filters if necessary.
+    if 'state' in request.args:
+        businesses = filter_db(businesses, 'state', request.args['state'])
+        filters['state'] = request.args['state']
+    if 'country' in request.args:
+        businesses = filter_db(businesses, 'country', request.args['country'])
+        filters['country'] = request.args['country']
+
+    response = {'businesses': businesses[start:end],
+                'page': page,
+                'entries': entries}
+
+    if len(filters) > 0:
+        response['filters'] = filters
+
+    if len(businesses[start:end]) > 0:
+        return jsonify(response)
     else:
         abort(404)
 
