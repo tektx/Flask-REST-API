@@ -24,7 +24,7 @@ def create_db(csv_path):
         csv_path (str): The path to the CSV file.
 
     Returns:
-        list[dict{str,str}]: The business info in JSON-formatted dictionaries.
+        list[dict]: The business info in JSON-formatted dictionaries.
 
     Raises:
         IOError: No file was found using the provided path.
@@ -47,22 +47,30 @@ def create_db(csv_path):
 
 @app.route('/businesses', methods=['GET'])
 def get_businesses():
-    entries = 3
-    if 'page' in request.args:
-        page = int(request.args['page'])
-        start = (page-1) * entries
-        end = start + entries
-        if len(db[start:end]) > 0:
-            return jsonify({'businesses': db[start:end], 'page': page})
-        else:
-            abort(404)
+    """Displays a paginated list of businesses sorted by ID.
+
+    Shows the information for the first 50 businesses by default. Accepts
+    parameters to display a certain page or change the number of entries
+    displayed per page.
+
+    Returns:
+        dict: Business information and pagination metadata.
+    """
+    entries = int(request.args['entries']) if 'entries' in request.args else 3
+    page = int(request.args['page']) if 'page' in request.args else 1
+    start = (page-1) * entries
+    end = start + entries
+    if len(db[start:end]) > 0:
+        return jsonify({'businesses': db[start:end],
+                        'page': page,
+                        'entries': entries})
     else:
-        return jsonify({'businesses': db[:entries]})
+        abort(404)
 
 
-@app.route('/businesses/<int:task_id>', methods=['GET'])
-def get_business(task_id):
-    business = [business for business in db if business['id'] == task_id]
+@app.route('/businesses/<int:business_id>', methods=['GET'])
+def get_business(business_id):
+    business = [business for business in db if business['id'] == business_id]
     if len(business) == 0:
         abort(404)
     return jsonify({'business': business[0]})
