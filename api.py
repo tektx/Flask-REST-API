@@ -56,7 +56,7 @@ def get_businesses():
     Returns:
         dict: Business information and pagination metadata.
     """
-    entries = int(request.args['entries']) if 'entries' in request.args else 3
+    entries = int(request.args['entries']) if 'entries' in request.args else 50
     page = int(request.args['page']) if 'page' in request.args else 1
     start = (page-1) * entries
     end = start + entries
@@ -113,7 +113,7 @@ def not_allowed(error):
 
 def main():
     global db
-    db = create_db('sample.csv')
+    db = create_db('50k_businesses.csv')
     app.run(debug=True)
 
 
