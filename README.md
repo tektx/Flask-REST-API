@@ -2,7 +2,7 @@
 This application creates a REST API from a CSV file, and provides endpoints to view information for businesses as a paginated group or by individual business. It was created using Flask and Python 2.7.
 
 ## Prerequisites
-1. Python 2.7 - Download [here](https://www.python.org/downloads/).
+1. Python 2.7 - Download [here](https://www.python.org/downloads/) and add to the system path.
 2. virtualenv for Python - Open a command-line window and run ```pip install virtualenv```.
 3. Flask for Python - Open a command-line window and run ```pip install flask```.
 
