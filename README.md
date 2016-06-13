@@ -17,11 +17,11 @@ Retrieves the first 50 results in JSON format in ascending order by ID.
 
 Two parameters are supported: ```page``` will display a specific page of results, and ```entries``` will change the number of results displayed per page.
 
-Example: ```http://localhost.com:5000/businesses``` will show the first page of entries.
+Example: ```http://localhost:5000/businesses``` will show the first page of entries.
 
-Example: ```http://localhost.com:5000/businesses?page=2&entries=10``` will show the second page of businesses at 10 entries per page.
+Example: ```http://localhost:5000/businesses?page=2&entries=10``` will show the second page of entries at 10 entries per page.
 
 ### GET /businesses/{id}
 Retrieves the information for the business with the specified ID.
 
-Example: ```http://localhost.com:5000/businesses/5``` will show information for the business with an ID value of 5.
+Example: ```http://localhost:5000/businesses/5``` will show information for the business with an ID value of 5.
