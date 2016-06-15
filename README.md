@@ -3,7 +3,7 @@ This application creates a REST API from a CSV file, and provides endpoints to v
 
 ## Prerequisites
 1. Python 2.7 - Download [here](https://www.python.org/downloads/) and add to the system path.
-2. virtualenv for Python - Open a command-line window and run ```pip install virtualenv```.
+2. pip for Python - Packaged with most versions of Python, or available [here](https://pip.pypa.io/en/stable/installing/).
 3. Flask for Python - Open a command-line window and run ```pip install flask```.
 
 ## Run
