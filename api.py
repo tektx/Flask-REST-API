@@ -7,7 +7,8 @@ format. This data is then accessible from REST API endpoints.
 
 import csv
 import sys
-from flask import Flask, jsonify, make_response, request, abort
+from functools import wraps
+from flask import Flask, jsonify, make_response, request, abort, Response
 
 __author__ = "Travis Knight"
 __email__ = "Travisknight@gmail.com"
@@ -43,6 +44,41 @@ def create_db(csv_path):
     except IOError as ioe:
         print ioe
         sys.exit(1)
+
+
+def check_auth(username, password):
+    """Checks if a username and password combination is valid.
+
+    Args:
+        username (str): The username to check.
+        password (str): The password to check.
+
+    Returns:
+        bool: True if the combination is authentication, False otherwise.
+    """
+    return username == 'admin' and password == 'secret'
+
+
+def authenticate():
+    """Sends a 401 response that enables basic auth."""
+    return Response('Could not verify your access level for that URL.\nYou need proper credentials', 401,
+                    {'WWW-Authenticate': 'Basic realm="Login Required"'})
+
+
+def requires_auth(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        auth = request.authorization
+        if not auth or not check_auth(auth.username, auth.password):
+            return authenticate()
+        return f(*args, **kwargs)
+    return decorated
+
+
+@app.route('/secret-page')
+@requires_auth
+def secret_page():
+    return ""
 
 
 @app.route('/businesses', methods=['GET'])
