@@ -65,6 +65,21 @@ def authenticate():
                     {'WWW-Authenticate': 'Basic realm="Login Required"'})
 
 
+def check_num(val):
+    """Throws an error if expected integer values are not ints.
+
+    Args:
+        val (str): The value expected to be an integer.
+
+    Returns:
+        int: The input value as an integer, or an error thrown if it isn't an integer.
+    """
+    try:
+        return int(val)
+    except ValueError:
+        abort(404)
+
+
 def requires_auth(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -92,8 +107,8 @@ def get_businesses():
     Returns:
         dict: Business information and pagination metadata.
     """
-    entries = int(request.args['entries']) if 'entries' in request.args else 50
-    page = int(request.args['page']) if 'page' in request.args else 1
+    entries = check_num(request.args['entries']) if 'entries' in request.args else 50
+    page = check_num(request.args['page']) if 'page' in request.args else 1
     start = (page-1) * entries
     end = start + entries
     if len(db[start:end]) > 0:
