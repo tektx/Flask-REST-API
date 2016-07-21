@@ -61,7 +61,8 @@ def check_auth(username, password):
 
 def authenticate():
     """Sends a 401 response that enables basic auth."""
-    return Response('Could not verify your access level for that URL.\nYou need proper credentials', 401,
+    return Response('Could not verify your access level for that URL.\n'
+                    'You need proper credentials', 401,
                     {'WWW-Authenticate': 'Basic realm="Login Required"'})
 
 
@@ -72,7 +73,7 @@ def check_num(val):
         val (str): The value expected to be an integer.
 
     Returns:
-        int: The input value as an integer, or an error thrown if it isn't an integer.
+        int: The input value as an integer, or an error thrown if not an int.
     """
     try:
         return int(val)
@@ -96,6 +97,30 @@ def secret_page():
     return ""
 
 
+def filter_db(input_db, key_filter, val_filter):
+    """Returns a new database with filters applied.
+
+    Opens a database and reads the key values for each entry. All entries with
+    key values that match the provided filter arguments are added to a temp
+    database and returned.
+    Args:
+        input_db (list[dict]): The database to filter.
+        key_filter (str): The key to filter.
+        val_filter (str): The key value required for entries in the filtered
+            database.
+
+    Returns:
+        list[dict]: The filtered database.
+    """
+    filtered_db = []
+
+    for entry in input_db:
+        if entry[key_filter] == val_filter:
+            filtered_db.append(entry)
+
+    return filtered_db
+
+
 @app.route('/businesses', methods=['GET'])
 def get_businesses():
     """Displays a paginated list of businesses sorted by ID.
@@ -107,14 +132,33 @@ def get_businesses():
     Returns:
         dict: Business information and pagination metadata.
     """
-    entries = check_num(request.args['entries']) if 'entries' in request.args else 50
+    global db
+
+    businesses = db
+    filters = {}
+    entries = check_num(request.args['entries']) if 'entries' in request.args\
+        else 50
     page = check_num(request.args['page']) if 'page' in request.args else 1
     start = (page-1) * entries
     end = start + entries
-    if len(db[start:end]) > 0:
-        return jsonify({'businesses': db[start:end],
-                        'page': page,
-                        'entries': entries})
+
+    # Apply filters if necessary.
+    if 'state' in request.args:
+        businesses = filter_db(businesses, 'state', request.args['state'])
+        filters['state'] = request.args['state']
+    if 'country' in request.args:
+        businesses = filter_db(businesses, 'country', request.args['country'])
+        filters['country'] = request.args['country']
+
+    response = {'businesses': businesses[start:end],
+                'page': page,
+                'entries': entries}
+
+    if len(filters) > 0:
+        response['filters'] = filters
+
+    if len(businesses[start:end]) > 0:
+        return jsonify(response)
     else:
         abort(404)
 
