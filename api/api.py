@@ -6,43 +6,91 @@ format. This data is then accessible from REST API endpoints.
 """
 
 import csv
+import os
+from sqlite3 import dbapi2 as sqlite3
 import sys
 from functools import wraps
-from flask import Flask, jsonify, make_response, request, abort, Response
+from flask import Flask, jsonify, make_response, request, abort, Response, g
 
 __author__ = "Travis Knight"
 __email__ = "Travisknight@gmail.com"
 __license__ = "BSD"
 
 app = Flask(__name__)
-db = []
+
+app.config.from_object(__name__)
+
+app.config.update(dict(
+    DATABASE=os.path.join(app.root_path, 'businesses.db'),
+    SECRET_KEY='development key',
+    USERNAME='admin',
+    PASSWORD='pass'
+))
+app.config.from_envvar('API_SETTINGS', silent=True)
 
 
-def create_db(csv_path):
-    """Reads the CSV of businesses and processes them into dictionaries.
+def connect_db():
+    """Connects to the database."""
+    rv = sqlite3.connect(app.config['DATABASE'])
+    rv.row_factory = sqlite3.Row
+    return rv
+
+
+def init_db():
+    db = get_db()
+    with app.open_resource('schema.sql', mode='r') as f:
+        db.cursor().executescript(f.read())
+    db.commit()
+
+
+@app.cli.command('initdb')
+def initdb_command():
+    """Initializes the database."""
+    init_db()
+    import_db('api' + os.sep + 'sample.csv')
+    print('Initialized the database.')
+
+
+def get_db():
+    """Opens a new database connection if there is none yet."""
+    if not hasattr(g, 'sqlite_db'):
+        g.sqlite_db = connect_db()
+    return g.sqlite_db
+
+
+@app.teardown_appcontext
+def close_db(error):
+    """Closes the database again at the end of the request."""
+    if hasattr(g, 'sqlite_db'):
+        g.sqlite_db.close()
+
+
+def import_db(csv_path):
+    """Reads a CSV of businesses and imports them into the database.
 
     Args:
         csv_path (str): The path to the CSV file.
 
-    Returns:
-        list[dict]: The business info in JSON-formatted dictionaries.
-
     Raises:
         IOError: No file was found using the provided path.
     """
-    businesses = []
-
+    db = get_db()
     try:
         with open(csv_path, 'r') as csv_file:
-            csv_file.seek(0)
             reader = csv.DictReader(csv_file)
             for row in reader:
-                row['id'] = int(row['id'])
-                businesses.append(row)
-        return businesses
+                db.execute('insert into entries ('
+                           'uuid, name, address, address2, city, state, zip,'
+                           'country, phone, website, created_at) values'
+                           '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                           [row['uuid'], row['name'], row['address'],
+                            row['address2'], row['city'], row['state'],
+                            row['zip'], row['country'], row['phone'],
+                            row['website'], row['created_at']])
+                db.commit()
 
     except IOError as ioe:
-        print ioe
+        print(ioe)
         sys.exit(1)
 
 
@@ -67,7 +115,7 @@ def authenticate():
 
 
 def check_num(val):
-    """Throws an error if expected integer values are not ints.
+    """Throws an error if expected value is not an integer.
 
     Args:
         val (str): The value expected to be an integer.
@@ -97,32 +145,8 @@ def secret_page():
     return ""
 
 
-def filter_db(input_db, key_filter, val_filter):
-    """Returns a new database with filters applied.
-
-    Opens a database and reads the key values for each entry. All entries with
-    key values that match the provided filter arguments are added to a temp
-    database and returned.
-    Args:
-        input_db (list[dict]): The database to filter.
-        key_filter (str): The key to filter.
-        val_filter (str): The key value required for entries in the filtered
-            database.
-
-    Returns:
-        list[dict]: The filtered database.
-    """
-    filtered_db = []
-
-    for entry in input_db:
-        if entry[key_filter] == val_filter:
-            filtered_db.append(entry)
-
-    return filtered_db
-
-
-@app.route('/businesses', methods=['GET'])
-def get_businesses():
+@app.route('/businesses')
+def show_entries():
     """Displays a paginated list of businesses sorted by ID.
 
     Shows the information for the first 50 businesses by default. Accepts
@@ -130,45 +154,34 @@ def get_businesses():
     displayed per page.
 
     Returns:
-        dict: Business information and pagination metadata.
+        json: Business information and pagination metadata.
     """
-    global db
-
-    businesses = db
-    filters = {}
+    db = get_db()
     entries = check_num(request.args['entries']) if 'entries' in request.args\
         else 50
     page = check_num(request.args['page']) if 'page' in request.args else 1
     start = (page-1) * entries
     end = start + entries
+    cur = db.execute('select * from entries '
+                     'where id > ? and id <= ? '
+                     'order by id asc', [start, end])
+    fetched = cur.fetchall()
+    rv = {'businesses': [dict((cur.description[idx][0], value)
+                              for idx, value in enumerate(row))
+                         for row in fetched],
+          'page': page,
+          'entries': entries}
 
-    # Apply filters if necessary.
-    if 'state' in request.args:
-        businesses = filter_db(businesses, 'state', request.args['state'])
-        filters['state'] = request.args['state']
-    if 'country' in request.args:
-        businesses = filter_db(businesses, 'country', request.args['country'])
-        filters['country'] = request.args['country']
-
-    response = {'businesses': businesses[start:end],
-                'page': page,
-                'entries': entries}
-
-    if len(filters) > 0:
-        response['filters'] = filters
-
-    if len(businesses[start:end]) > 0:
-        return jsonify(response)
-    else:
-        abort(404)
+    return jsonify(rv)
 
 
 @app.route('/businesses/<int:business_id>', methods=['GET'])
 def get_business(business_id):
+    db = get_db()
     business = [business for business in db if business['id'] == business_id]
     if len(business) == 0:
         abort(404)
-    return jsonify({'business': business[0]})
+    return jsonify({'businesses': business[0]})
 
 
 @app.errorhandler(400)
@@ -207,8 +220,6 @@ def not_allowed(error):
 
 
 def main():
-    global db
-    db = create_db('50k_businesses.csv')
     app.run(debug=True)
 
 
