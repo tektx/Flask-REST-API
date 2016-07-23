@@ -178,10 +178,14 @@ def show_entries():
 @app.route('/businesses/<int:business_id>', methods=['GET'])
 def get_business(business_id):
     db = get_db()
-    business = [business for business in db if business['id'] == business_id]
-    if len(business) == 0:
+    cur = db.execute('select * from entries '
+                     'where id = ?', [business_id])
+    fetched = cur.fetchall()
+    if len(fetched) == 0:
         abort(404)
-    return jsonify({'businesses': business[0]})
+    return jsonify({'businesses': [dict((cur.description[idx][0], value)
+                                        for idx, value in enumerate(row))
+                                   for row in fetched]})
 
 
 @app.errorhandler(400)
